@@ -1,0 +1,4 @@
+lcd "C:\Users\marki\git\RCBoat\RCBoat\TestCode"
+cd /home/pi/RCBoat/TestCode
+put *.py
+exit

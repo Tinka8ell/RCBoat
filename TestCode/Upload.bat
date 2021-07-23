@@ -1,0 +1,3 @@
+@echo off
+echo Update to PiCam ...
+sftp pi@PiCam  < Upload.txt
