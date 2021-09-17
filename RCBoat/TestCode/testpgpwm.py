@@ -31,7 +31,7 @@ class testpgpwm(reader):
             pi = pigpio.pi()
         self.pi = pi
 
-        self._high_tick = None
+        self._highTick = None
 
         pi.set_mode(gpio, pigpio.INPUT)
         self._cb = pi.callback(gpio, pigpio.EITHER_EDGE, self._cbf)
@@ -39,16 +39,16 @@ class testpgpwm(reader):
 
     def _cbf(self, gpio, level, tick):
         if level == 1:
-            if self._high_tick is not None:
-                t = pigpio.tickDiff(self._high_tick, tick)
+            if self._highTick is not None:
+                t = pigpio.tickDiff(self._highTick, tick)
                 if self._period is not None:
                     self._period = (self._old * self._period) + (self._new * t)
                 else:
                     self._period = t
-            self._high_tick = tick
+            self._highTick = tick
         elif level == 0:
-            if self._high_tick is not None:
-                t = pigpio.tickDiff(self._high_tick, tick)
+            if self._highTick is not None:
+                t = pigpio.tickDiff(self._highTick, tick)
                 if self._high is not None:
                     self._high = (self._old * self._high) + (self._new * t)
                 else:

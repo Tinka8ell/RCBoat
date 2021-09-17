@@ -1,0 +1,13 @@
+lcd "C:\Users\marki\git\RCBoat\RCBoat"
+cd /home/pi/RCBoat
+put *.py
+lcd "TestCode"
+cd TestCode
+put *.py
+lcd "..\RCBoat"
+cd ../RCBoat
+put *.py
+lcd "unittests"
+cd unittests
+put *.py
+exit
