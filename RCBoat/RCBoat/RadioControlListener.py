@@ -125,7 +125,8 @@ class RadioControlListener(object):
         for pin in pins:
             gpio, pwMid, pwRange = pin
             # listeners is a list of tuples: listener object, maximum and minimum sizes
-            self.listeners.append((PWMListener(gpio, name), pwMid + pwRange, pwMid - pwRange))
+            lName = name + " - " + str(gpio)
+            self.listeners.append((PWMListener(gpio, lName), pwMid + pwRange, pwMid - pwRange))
         self.lastValue = self.value()
         self.health = self.checkPins()
 
@@ -134,6 +135,11 @@ class RadioControlListener(object):
         # print("Creating thread")
         self.heartBeat = Thread(target=self.run, name=self.name)
         # print("Setup complete")
+        for listener, maximum, minimum in self.listeners:
+            prefix = "listener(None):"
+            if listener is not None:
+                prefix = "listener(" + listener.name + "):"
+            print(prefix, "max =", maximum, ", min=", minimum)
         return
 
     def start(self):
@@ -143,41 +149,16 @@ class RadioControlListener(object):
         return
 
     def run(self):
+        '''
+        Place code to run periodically here.
+        Return values via the whenValueChanged callback.
+        Return health changes through the whenHealthChanged callback.
+        Loop until self.ok is false ...
+        '''
         while self.ok:
             sleep(self.period)
-            health = self.checkPins()
-            value = self.value()
-            '''
-            if self.name == "Main":
-                print(self.name, "health =", health, "value =", value)
-            '''
-            changed = False
-            healthChanged = False
-            for i in range(len(value)):
-                healthChanged = healthChanged or (self.health[i] != health[i])
-                self.health[i] = health[i]
-                change = int(value[i] - self.lastValue[i])
-                '''
-                if self.name == "Main" and i == 0:
-                    print("health =", health[i], "value =", value[i], "change =", change)
-                '''
-                if not health[i]: # this listener is dead!
-                    change = - self.lastValue[i] # centre the stick
-                elif self.smoothing > 0 and change != 0: # limit rate of change
-                    if change > 0:
-                        change = max(change, self.smoothing)
-                    if change < 0:
-                        change = min(change, -self.smoothing)
-                if change != 0:
-                    changed = True
-                    self.lastValue[i] += change
-            if changed:
-                # print(self.name, "Changed:", self.lastValue)
-                if self.whenValueChanged is not None:
-                    self.whenValueChanged(self.lastValue)
-            if healthChanged:
-                if self.whenHealthChanged is not None:
-                    self.whenHealthChanged(self.health)
+            print("RadioControlListener not yet implemented!")
+            self.ok = False # end early!
         print(self.name, "heart beat stopped")
         return
 
@@ -212,6 +193,18 @@ class RadioControlListener(object):
             else: # make it the middle
                 values.append(0)
         return values
+
+    def debugValue(self):
+        '''
+        List of current values of the listeners
+        '''
+        for listener, maximum, minimum in self.listeners:
+            name = listener.name
+            value = listener.value()
+            mx, mn = listener.debugValue()
+            print(name, "Value =", value, ", q=", quantum(value, maximum, minimum, self.quanti),
+                  "max =", maximum, " / ", mx, "min =", minimum, " / ", mn)
+        return
 
     def stop(self):
         '''
@@ -277,6 +270,8 @@ class PWMListener(object):
         self.pi = pigpio.pi()
         self.pi.set_mode(self.pin, pigpio.INPUT)
         self._callback = self.pi.callback(self.pin, pigpio.EITHER_EDGE, self._edgeDetected)
+        self._debugMax = None
+        self._debugMin = None
         return
 
     def _edgeDetected(self, gpio, level, tick):
@@ -324,6 +319,9 @@ class PWMListener(object):
     def value(self):
         return self.pulse_width()
 
+    def debugValue(self):
+        return self._debugMax, self._debugMin
+
     def frequency(self):
         """
         Returns the last detected PWM frequency.
@@ -340,6 +338,15 @@ class PWMListener(object):
         value = 0
         if self._high is not None:
             value = self._high
+        if value > 0:
+            if self._debugMax is None:
+                self._debugMax = value
+            if self._debugMax < value:
+                self._debugMax = value
+            if self._debugMin is None:
+                self._debugMin = value
+            if self._debugMin > value:
+                self._debugMin = value
         return value
 
     def duty_cycle(self):

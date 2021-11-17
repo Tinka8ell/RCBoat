@@ -35,7 +35,6 @@ class PWMGenerator():
     Use defaults of  maxDC = 2020/20000, minDC = 1010/20000
     '''
 
-
     def __init__(self, rudder, motor, maxDC=2020/20000, minDC=1010/20000, name="PWMGenerator"):
         '''
         Constructor takes two ports simulating the
@@ -71,12 +70,14 @@ class PWMGenerator():
     def run(self):
         base = time.time()
         '''
+        print("PWMGenerator started")
         interval = 17 # every 1.7 seconds
         count = interval
         '''
         while self.ok:
-            theta = (time.time() - base) / 30 # as a fraction of half a minute
-            theta *= math.pi * 2
+            seconds = (time.time() - base)
+            cycle = seconds / 60 # as a fraction of a minute
+            theta = cycle * math.pi * 2
             cos = math.cos(theta)
             sin = math.sin(theta)
             self.rudder.value = self.toPWM(cos, self.max, self.min)
@@ -84,7 +85,8 @@ class PWMGenerator():
             '''
             count -= 1
             if count < 0:
-                print("Current values: rudder =", self.rudder.value, ", motor =", self.motor.value)
+                print("Current generator values: rudder =", self.rudder.value*1000, cos,
+                      ",motor =", self.motor.value*1000, sin)
                 count = interval
             '''
             time.sleep(0.1) # try to make it fairly smooth

@@ -4,145 +4,92 @@ Created on 23 Jul 2021
 @author: Tinka
 '''
 
-from RCBoat.RadioControlListener import RadioControlListener
+from RCBoat.TestBoat import testBoat
 from RCBoat.PWMGenerator import PWMGenerator
-from RCBoat.BlueDotPWMGenerator import BlueDotPWMGenerator
-from threading import Lock, enumerate
-import time
-from time import sleep
 
-def showThreads():
-    threads = enumerate()
-    count = len(threads)
-    print("Currently", count, "threads.")
-    for thread in threads:
-        print("Thread:", thread.name, "is alive:", thread.is_alive())
-    return
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     '''
-    From data received:
-    Motor:
-    1095
-    1400 - 1510
-    1920
-    average = 1507.5
-    width = 412.5
+    The raspberry pi pins (taken from outout from pinout with added *'s) are:
+    J8:
+        3V3  (1) (2)  5V
+    **GPIO2  (3) (4)  5V
+    **GPIO3  (5) (6)  GND
+      GPIO4  (7) (8)  GPIO14
+        GND  (9) (10) GPIO15
+     GPIO17 (11) (12) GPIO18*
+     GPIO27 (13) (14) GND
+     GPIO22 (15) (16) GPIO23
+        3V3 (17) (18) GPIO24
+     GPIO10 (19) (20) GND
+      GPIO9 (21) (22) GPIO25
+     GPIO11 (23) (24) GPIO8
+        GND (25) (26) GPIO7
+      GPIO0 (27) (28) GPIO1
+      GPIO5 (29) (30) GND
+      GPIO6 (31) (32) GPIO12*
+    *GPIO13 (33) (34) GND
+    *GPIO19 (35) (36) GPIO16
+     GPIO26 (37) (38) GPIO20
+        GND (39) (40) GPIO21
 
-    Rudder:
-    1010
-    1560
-    2020
-    average = 1515
-    width = 505
-    but mid rudder is 1560 so
-    width = 550 or 460!
+    As
+    ** I2C (for turrets) uses:
+    Data:  (GPIO2)
+    Clock: (GPIO3)
+    and
+    * hardware PWM is on pins:
+    GPIO12, GPIO13, GPIO18, GPIO19
+
+    Suggest use:
+    GPIO14, GPIO15, GPIO18* - use GPIO26
+    GPIO5, GPIO6, GPIO13* - use GPIO23
+    GPIO20, GPIO26, GPIO19*
+    for the H-bridge motors
+    and GPIO12* for the servo for the ruder
+    So you can make use of the hardware PWM
+    and have each motor use 3 pins close to each other
+
+    for testing will use GPIO13 & GPIO18 for the PWMGenerator
+    so will need different pins for the motors, but as we are using
+    virtual Pins not a problem.
     '''
 
-    print("Running test with pins 13 & 18 connected to pins 4 & 5")
-    # showThreads()
-    print("Starting test signal on pins 13 & 18")
-    pmwGenerator = PWMGenerator(13, 18) # if using cycle
-    # wGenerator = BlueDotPWMGenerator(13, 18) # if using BlueDot
+    # hardware PWM: GPIO12, GPIO13, GPIO18, GPIO19
 
-    print("Just loading RadioControlListener listening on 4 & 5")
-    rcListen = RadioControlListener(
-        (
-            (4, 1569, 550), # set mid as 1/2 and range as 1/4 away from that
-            (5, 1507, 412)  # set mid as 1/2 and range as 1/4 away from that
-            ),
-            smoothing=1,
-            name="Main"
+    PWMA = 18
+    PWMB = 13
+    PMWC = 12
+    PMWD = 19
+    TestHarness = False
+    if TestHarness:
+
+        print("Running test with pins 13 & 18 connected to pins 4 & 5")
+        # showThreads()
+        print("Starting test signal on pins 13 & 18")
+        # Using default pin factory fir the generator ...
+        pmwGenerator = PWMGenerator(PWMB, PWMA) # if using cycle
+
+        # comment out this line to use real pins
+        # Device.pin_factory = MockFactory(pin_class=MockPWMPin)
+
+        PWMA = 26
+        PWMB = 16
+
+    # for 3-pin motors:
+    left = (20, 21, PMWD)
+    right = (7, 1, PMWC)
+    center = (23, 24, PWMA)
+
+    # other pins
+    servo = PWMB
+
+    print("About to start")
+
+    # this starts the boat
+    print("Using RadioControlListener listening on 4 & 5")
+    rcpins = (
+        (4, 1569, 550), # set mid as 1/2 and range as 1/4 away from that
+        (5, 1507, 412)  # set mid as 1/2 and range as 1/4 away from that
         )
-    print("Just loading RadioControlListener 100 listening on 21 & 22")
-    rcListen100 = RadioControlListener(
-        (
-            (21, 1569, 550), # set mid as 1/2 and range as 1/4 away from that
-            (22, 1507, 412)  # set mid as 1/2 and range as 1/4 away from that
-            ),
-            smoothing=0,
-            quanti=10,
-            name="Secondary"
-        )
-    # showThreads()
-
-    _lock = Lock()
-    _lock.acquire()
-    messages = []
-    start = time.time()
-    last = [0] * 4
-
-    def onHealthChange(health):
-        print("Seen health change:", health)
-        return
-
-    def onHealthChange100(health):
-        print("Seen health change (100):", health)
-        return
-
-    def onChange(value):
-        message = str(int((time.time() - start) * 1000))
-        for i in range(len(value)):
-            last[i] = value[i]
-        for item in last:
-            message += ", " + str(item)
-        messages.append(message)
-        # print(message)
-        return
-
-    def onChange100(value):
-        message = str(int((time.time() - start) * 1000))
-        for i in range(len(value)):
-            last[i + len(value)] = value[i]
-        for item in last:
-            message += ", " + str(item)
-        messages.append(message)
-        return
-
-    rcListen.whenValueChanges(onChange)
-    rcListen.whenHealthChanges(onHealthChange)
-    rcListen100.whenValueChanges(onChange100)
-    rcListen100.whenHealthChanges(onHealthChange100)
-    print("All set up")
-    sleep(1)
-
-    print("Start main")
-    rcListen.start()
-    # showThreads()
-    # sleep(1)
-
-    print("Start secondary")
-    rcListen100.start()
-    # showThreads()
-
-    # _lock.acquire() # wait for death
-
-    # Wait for keyboard input
-    # input("Press return to stop")
-
-    # wait 1/2 minute
-    print("Waiting 1/2 a minute")
-    sleep(30)
-
-    print("Run complete")
-
-    with open("testData.txt", "w") as f:
-        for message in messages:
-            print(message, file=f)
-            print(message)
-
-    # showThreads()
-    print("Stopping RadioControlListeners")
-    rcListen.stop()
-    rcListen100.stop()
-    print("All stopped!")
-
-    showThreads()
-
-    print("Stopping generator")
-    pmwGenerator.cancel()
-    print("Waiting generator")
-    pmwGenerator.join()
-    print("Shut down")
-
-    showThreads()
+    # testBoat(left, right, center, servo, rcpins, reactive=True, TestHarness=True) # for testing with reactive ...
+    testBoat(left, right, center, servo, rcpins, reactive=False, TestHarness=True) # for testing without reactive ...
